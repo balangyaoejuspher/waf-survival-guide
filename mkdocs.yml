@@ -1,0 +1,96 @@
+site_name: WAF Survival Guide
+site_description: Cross-provider, developer-first handbook for surviving Web Application Firewalls.
+site_url: https://balangyaoejuspher.github.io/waf-survival-guide/
+repo_url: https://github.com/balangyaoejuspher/waf-survival-guide
+repo_name: balangyaoejuspher/waf-survival-guide
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+site_dir: _site
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Triage:
+      - 5-minute flow: triage/README.md
+      - App vs WAF: triage/identifying-blocks.md
+  - Concepts:
+      - Cookie / JWT false positives: concepts/cookie-false-positives.md
+      - XSS on rich text: concepts/xss-rich-text.md
+      - Rate limiting & 429: concepts/rate-limiting.md
+      - Geoblocking exceptions: concepts/geoblocking-exceptions.md
+      - Payload / body size: concepts/payload-size.md
+  - Rules (Top 10):
+      - 942100 — SQLi (libinjection): rules/942100.md
+      - 941100 — XSS (libinjection): rules/941100.md
+      - 941160 — NoScript HTML-tag set: rules/941160.md
+      - 932100 — Unix RCE: rules/932100.md
+      - 930100 — Path traversal: rules/930100.md
+      - 920280 — Missing Host: rules/920280.md
+      - 920350 — Host is numeric IP: rules/920350.md
+      - 913100 — Scanner UA: rules/913100.md
+      - 921110 — Request smuggling: rules/921110.md
+      - 949110 — Anomaly score: rules/949110.md
+  - Provider guides:
+      - GCP Cloud Armor: provider-guides/gcp-cloud-armor.md
+      - AWS WAF: provider-guides/aws-waf.md
+      - Cloudflare WAF: provider-guides/cloudflare-waf.md
+  - Advanced:
+      - Anomaly scoring models: advanced/anomaly-scoring.md
+      - Custom expressions: advanced/custom-expressions.md
+      - CI/CD GitOps integration: advanced/cicd-integration.md
+  - Project:
+      - Audit ledger: _root/EXCEPTIONS.md
+      - Contributing: _root/CONTRIBUTING.md
+      - Code of Conduct: _root/CODE_OF_CONDUCT.md
+      - Security: _root/SECURITY.md
+      - License: _root/LICENSE.md

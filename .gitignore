@@ -1,0 +1,30 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Terraform (if local IaC experiments land here)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!example.tfvars
+crash.log
+crash.*.log
+
+# Secrets / local env
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Logs
+*.log
+
+# MkDocs build output
+_site/
+.cache/
+docs/_root/
+docs/index.md

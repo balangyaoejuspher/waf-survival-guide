@@ -1,0 +1,5 @@
+# Force LF for shell scripts so they execute correctly on Linux CI runners.
+*.sh text eol=lf
+
+# Treat all other text the same as the OS default.
+* text=auto

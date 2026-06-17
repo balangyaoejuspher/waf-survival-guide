@@ -1,0 +1,67 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  markdownlint:
+    name: markdown-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DavidAnson/markdownlint-cli2-action@v18
+        with:
+          globs: |
+            **/*.md
+            !**/node_modules/**
+
+  linkcheck:
+    name: link-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: lychee
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: >-
+            --no-progress
+            --max-concurrency 8
+            --accept 200..=299,403,429
+            './**/*.md'
+          fail: true
+
+  audit-row-freshness:
+    name: audit-row-freshness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check EXCEPTIONS.md review dates
+        run: |
+          chmod +x .ci/audit-row-freshness.sh
+          .ci/audit-row-freshness.sh EXCEPTIONS.md
+
+  mkdocs-build:
+    name: mkdocs-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+      - run: pip install -r requirements-docs.txt
+      - run: |
+          chmod +x .ci/prepare-docs.sh
+          .ci/prepare-docs.sh
+      - run: mkdocs build

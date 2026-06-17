@@ -1,0 +1,14 @@
+# Skip example / placeholder hosts and known-ephemeral references.
+^https://app\.example\.com
+^https://api\.example\.com
+^https://cms\.example\.com
+^https://staging\.example\.com
+^https://uploads\.example\.com
+^https://anytool\.example\.com
+^https://raw-ip\.test
+^https://1\.2\.3\.4
+
+# Cloudflare / vendor IP-list endpoints sometimes rate-limit unauthenticated checks.
+^https://www\.cloudflare\.com/ips
+^https://api\.fastly\.com/public-ip-list
+^https://api\.github\.com/meta
