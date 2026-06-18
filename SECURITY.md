@@ -1,4 +1,4 @@
-﻿# Security Policy
+# Security Policy
 
 ## Supported Versions
 
@@ -6,8 +6,8 @@ Only the latest version of the `waf-survival-guide` documentation, templates, an
 
 | Version | Supported |
 | ------- | --------- |
-| Latest  | âœ… Yes    |
-| < Older | âŒ No     |
+| Latest  | ✅ Yes    |
+| < Older | ❌ No     |
 
 ---
 

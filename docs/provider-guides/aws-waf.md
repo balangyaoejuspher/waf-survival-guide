@@ -1,4 +1,4 @@
-﻿# AWS WAF â€” Provider Reference
+# AWS WAF — Provider Reference
 
 > Stub. Console click-paths, AWS CLI, and Terraform / CloudFormation snippets for diagnosing and safely tuning AWS WAF v2 Web ACLs. Expand alongside concrete reproductions.
 
@@ -16,7 +16,7 @@
 
 AWS WAF v2 evaluates a **Web ACL** of rules on each request. A rule can be:
 
-- A managed rule group (`AWSManagedRulesCommonRuleSet`, `AWSManagedRulesSQLiRuleSet`, etc. â€” these map to OWASP CRS-like rule families).
+- A managed rule group (`AWSManagedRulesCommonRuleSet`, `AWSManagedRulesSQLiRuleSet`, etc. — these map to OWASP CRS-like rule families).
 - A rate-based statement.
 - A custom rule (regex / IP set / byte match / SQLi / XSS statement).
 
@@ -26,7 +26,7 @@ A managed rule's action can be overridden at the ACL level via **rule-action ove
 
 ## 3. The Log Evidence
 
-Web ACL logging must be enabled (Kinesis Firehose â†’ S3 / CloudWatch Logs). With CloudWatch Logs Insights:
+Web ACL logging must be enabled (Kinesis Firehose → S3 / CloudWatch Logs). With CloudWatch Logs Insights:
 
 ```text
 fields @timestamp, action, terminatingRuleId, terminatingRuleType, terminatingRuleMatchDetails, httpRequest.uri, httpRequest.clientIp

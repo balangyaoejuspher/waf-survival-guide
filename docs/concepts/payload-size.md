@@ -1,6 +1,6 @@
-﻿# Payload & Body Size Violations â€” Heavy Multi-Part Uploads
+# Payload & Body Size Violations — Heavy Multi-Part Uploads
 
-> **Scope of this file:** how to safely raise payload and body-size inspection limits for endpoints that legitimately accept large multi-part uploads (file uploads, video / image ingest, bulk-import CSVs, EDI / HL7 / FHIR healthcare payloads, log-ingest bulk endpoints, scientific data uploads) â€” and what additional defenses must compensate for the wider exposure. Covers Google Cloud Armor, AWS WAF, and Cloudflare side by side.
+> **Scope of this file:** how to safely raise payload and body-size inspection limits for endpoints that legitimately accept large multi-part uploads (file uploads, video / image ingest, bulk-import CSVs, EDI / HL7 / FHIR healthcare payloads, log-ingest bulk endpoints, scientific data uploads) — and what additional defenses must compensate for the wider exposure. Covers Google Cloud Armor, AWS WAF, and Cloudflare side by side.
 
 ---
 
@@ -9,7 +9,7 @@
 | Cross-provider signature                                                                                                                                    | Where you see it                                   |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | `HTTP 413 Payload Too Large` or `HTTP 403` returned at the edge for uploads above a threshold (commonly 1, 8, or 32 MB)                                     | Browser dev tools / upload UI                      |
-| Upload UI shows "Uploadingâ€¦ 99%" then fails; no entry in the backend application log                                                                        | App access log                                     |
+| Upload UI shows "Uploading… 99%" then fails; no entry in the backend application log                                                                        | App access log                                     |
 | The same upload **smaller than the threshold** succeeds and produces a normal handler-entry log line                                                        | Manual repro by shrinking the file                 |
 | Multi-part forms with many fields (each individually small, but aggregate > limit) fail                                                                     | Bulk-form endpoint                                 |
 | WAF managed-rule **does not detect** an attack pattern in a large body that exceeds the inspection limit (the body is silently un-inspected past the limit) | Sec-team alert that the WAF "didn't see" something |
@@ -25,7 +25,7 @@ Distinguishing fingerprint: failure correlates with **payload size**, not conten
 ### 2.1 Two distinct concepts often conflated
 
 1. **Maximum body size accepted by the edge.** If the request body exceeds this, the edge rejects with `413` (or `403` framed as protocol violation). Examples: GCP HTTPS LB default `32 MB`; AWS API Gateway default `10 MB`; Cloudflare default `100 MB` (paid plan dependent); nginx `client_max_body_size 1m`.
-2. **Maximum body size inspected by the WAF.** Even when the edge accepts the body, WAF rules may only inspect the first N bytes. Beyond N, the body is **not** inspected â€” meaning attack patterns past the cutoff slip through silently. Examples: AWS WAF default 8 KB (regional ACL) / 16 KB (CloudFront-scoped), raisable to 16/32/64 KB at cost; Cloud Armor inspects body for preconfigured WAF rules according to the policy's `body_inspection_size` setting; Cloudflare body inspection depends on rule type and plan.
+2. **Maximum body size inspected by the WAF.** Even when the edge accepts the body, WAF rules may only inspect the first N bytes. Beyond N, the body is **not** inspected — meaning attack patterns past the cutoff slip through silently. Examples: AWS WAF default 8 KB (regional ACL) / 16 KB (CloudFront-scoped), raisable to 16/32/64 KB at cost; Cloud Armor inspects body for preconfigured WAF rules according to the policy's `body_inspection_size` setting; Cloudflare body inspection depends on rule type and plan.
 
 The first is a hard limit (rejects the request). The second is a silent partial-inspection limit (the request goes through but is partially un-checked).
 
@@ -33,12 +33,12 @@ The first is a hard limit (rejects the request). The second is a silent partial-
 
 | Workload                                                                   | Typical size            | Why it must be allowed       |
 | -------------------------------------------------------------------------- | ----------------------- | ---------------------------- |
-| Video / image uploads (CMS, ad-network creative uploads)                   | 10 MB â€“ 500 MB          | Core product functionality.  |
-| Bulk CSV imports (customer onboarding, data migration)                     | 1 MB â€“ 1 GB             | One-off but high-impact.     |
-| Multi-part HL7 / FHIR healthcare payloads (with attachments, scanned PDFs) | 5 MB â€“ 50 MB            | Compliance-driven workflows. |
-| EDI X12 / EDIFACT batches                                                  | 1 MB â€“ 100 MB           | B2B integrations.            |
-| Log-ingest webhooks (Datadog, Splunk forwarders)                           | 1 MB â€“ 100 MB per batch | High-volume telemetry.       |
-| Scientific data (genomic sequences, sensor readings)                       | 100 MB â€“ multiple GB    | Domain-specific.             |
+| Video / image uploads (CMS, ad-network creative uploads)                   | 10 MB – 500 MB          | Core product functionality.  |
+| Bulk CSV imports (customer onboarding, data migration)                     | 1 MB – 1 GB             | One-off but high-impact.     |
+| Multi-part HL7 / FHIR healthcare payloads (with attachments, scanned PDFs) | 5 MB – 50 MB            | Compliance-driven workflows. |
+| EDI X12 / EDIFACT batches                                                  | 1 MB – 100 MB           | B2B integrations.            |
+| Log-ingest webhooks (Datadog, Splunk forwarders)                           | 1 MB – 100 MB per batch | High-volume telemetry.       |
+| Scientific data (genomic sequences, sensor readings)                       | 100 MB – multiple GB    | Domain-specific.             |
 | Backup uploads / archive submissions                                       | 1 GB+                   | Infrastructure workflows.    |
 
 ### 2.3 The two compensating-control patterns
@@ -48,14 +48,14 @@ When you raise the body-size limit, you widen the exposure surface. Two patterns
 1. **Pre-signed-URL pattern (preferred).** Issue a short-lived pre-signed URL (S3 / GCS / Azure Blob) from your application. The client uploads **directly to object storage**, bypassing your WAF entirely. Your application receives an upload-complete event (via S3 events / GCS Pub/Sub) and processes the file from storage. The WAF only sees the small "request a presigned URL" call, which has a tiny body.
 2. **Streaming / chunked upload with per-chunk inspection.** The client uploads in chunks (each small enough for full WAF inspection); the application reassembles. Common for resumable uploads (tus protocol, Google's resumable upload protocol).
 
-If neither pattern is feasible, raise the limits and document the **compensating controls at the app layer** (MIME-sniff the actual file content, scan with AV â€” ClamAV / Defender â€” before persisting, enforce per-customer size quotas at the app, monitor for upload-size anomalies).
+If neither pattern is feasible, raise the limits and document the **compensating controls at the app layer** (MIME-sniff the actual file content, scan with AV — ClamAV / Defender — before persisting, enforce per-customer size quotas at the app, monitor for upload-size anomalies).
 
 ### 2.4 Provider mapping
 
 | Provider                             | Edge body limit                                                                    | WAF inspection limit                                                                                                                                             | Notes                                                      |
 | ------------------------------------ | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | **GCP Cloud Armor**                  | HTTPS LB max 32 MB by default; can be increased via backend service configuration. | `body_inspection_size` on the security policy; default 8 KB; raisable; affects all preconfigured WAF rules.                                                      | Larger inspection = higher policy cost / latency.          |
-| **AWS WAF (Regional, ALB-attached)** | ALB max 1 MB â†’ 10 MB depending on target type; API Gateway max 10 MB.              | Default 8 KB; raisable via `AssociationConfig.RequestBody` settings to 16 / 32 / 64 KB per resource type. Beyond `RequestBody` limit, body is **not** inspected. | WCU costs increase with inspection size.                   |
+| **AWS WAF (Regional, ALB-attached)** | ALB max 1 MB → 10 MB depending on target type; API Gateway max 10 MB.              | Default 8 KB; raisable via `AssociationConfig.RequestBody` settings to 16 / 32 / 64 KB per resource type. Beyond `RequestBody` limit, body is **not** inspected. | WCU costs increase with inspection size.                   |
 | **AWS WAF (CloudFront-attached)**    | CloudFront max 32 MB upload by default (HTTP body), higher for chunked.            | Default 16 KB on CloudFront-scoped ACLs; raisable to 32/64 KB via `AssociationConfig`.                                                                           | Same cost trade-off.                                       |
 | **Cloudflare**                       | 100 MB default body size on most plans; higher on Enterprise.                      | Body inspection for managed rules depends on plan and rule; payload logging for inspection is gated behind plan tiers.                                           | Configure via dashboard or API; some inspection is opaque. |
 
@@ -143,7 +143,7 @@ print(f"attack offset: {body.find(attack)} (visible: {body.find(attack) < inspec
 PY
 ```
 
-This kind of analysis is what makes the inspection-limit gap dangerous â€” attackers can intentionally pad benign content to push the malicious payload past the inspection window.
+This kind of analysis is what makes the inspection-limit gap dangerous — attackers can intentionally pad benign content to push the malicious payload past the inspection window.
 
 ---
 
@@ -171,7 +171,7 @@ resource "google_compute_security_policy" "uploads" {
   }
 
   # Note: body inspection size is configured at the security policy level
-  # via Cloud Armor Enterprise (CAEP) â€” confirm tier before raising.
+  # via Cloud Armor Enterprise (CAEP) — confirm tier before raising.
   # For Standard tier, body inspection is limited; rely on path-scoped exclusions
   # and app-layer scanning for large uploads.
 
@@ -207,7 +207,7 @@ resource "google_compute_backend_service" "uploads" {
 
 ### 4.2 AWS WAF
 
-Raise the body inspection limit via `association_config` on the Web ACL â€” affects the ALB resource type:
+Raise the body inspection limit via `association_config` on the Web ACL — affects the ALB resource type:
 
 ```hcl
 resource "aws_wafv2_web_acl" "api" {
@@ -242,7 +242,7 @@ resource "aws_wafv2_web_acl" "api" {
 
 The inspection-limit raise is a Web-ACL-wide setting. For an upload-specific endpoint without raising globally, use a separate Web ACL on a dedicated upload subdomain (`uploads.example.com`) with its own larger limit, and keep the main API ACL at the default 8 KB.
 
-For pre-signed-URL pattern on AWS, the upload route hits S3 directly and never traverses ALB+WAF â€” eliminating the inspection-limit issue entirely.
+For pre-signed-URL pattern on AWS, the upload route hits S3 directly and never traverses ALB+WAF — eliminating the inspection-limit issue entirely.
 
 ### 4.3 Cloudflare
 
@@ -255,7 +255,7 @@ Cloudflare's body-size handling is mostly opaque (managed per plan). To handle l
 ```hcl
 resource "cloudflare_ruleset" "skip_managed_for_uploads" {
   zone_id = var.zone_id
-  name    = "Skip managed for /uploads â€” pre-signed body path"
+  name    = "Skip managed for /uploads — pre-signed body path"
   kind    = "zone"
   phase   = "http_request_firewall_custom"
 
@@ -276,14 +276,14 @@ resource "cloudflare_ruleset" "skip_managed_for_uploads" {
 
 - Upload of the target file size succeeds; backend handler-entry log line present.
 - A known-malicious test payload uploaded **as content of a large file** is caught by app-layer AV scanning (ClamAV / Defender) before persistence; logged with rejection event.
-- Per-customer upload quota enforcement at app layer still works (e.g. customer A is over their 1 GB monthly quota â†’ app returns 413, not the WAF).
+- Per-customer upload quota enforcement at app layer still works (e.g. customer A is over their 1 GB monthly quota → app returns 413, not the WAF).
 
 ---
 
 ## 5. Audit Trail
 
 ```
-| 2026-06-17 | uploads.example.com | aws-waf | Raised association_config request_body inspection to 32 KB on regional ALB | upload subdomain only | Video CMS allows up to 500 MB uploads; presigned-URL migration in flight (JIRA-9301, ETA Q3). Compensating: ClamAV scan in upload handler (commit a1b2c3d), per-customer monthly quota (commit d4e5f6g). | <link to before/after CloudWatch metrics + curl bisection> | preview 2026-06-17 â†’ enforce 2026-06-20 | @platform-lead + @secops-lead | 2026-09-15 (review at presigned-URL launch) |
+| 2026-06-17 | uploads.example.com | aws-waf | Raised association_config request_body inspection to 32 KB on regional ALB | upload subdomain only | Video CMS allows up to 500 MB uploads; presigned-URL migration in flight (JIRA-9301, ETA Q3). Compensating: ClamAV scan in upload handler (commit a1b2c3d), per-customer monthly quota (commit d4e5f6g). | <link to before/after CloudWatch metrics + curl bisection> | preview 2026-06-17 → enforce 2026-06-20 | @platform-lead + @secops-lead | 2026-09-15 (review at presigned-URL launch) |
 ```
 
 Two approvers: platform (because it raises infra cost) and secops (because it widens inspection gap).
@@ -298,17 +298,17 @@ Two approvers: platform (because it raises infra cost) and secops (because it wi
 - **MIME-type spoofing.** Don't trust the client's `Content-Type` on uploads. Sniff the actual bytes (libmagic, fileTypeMagic.js, magic-bytes.js, etc.) before persisting.
 - **AV scanning latency.** ClamAV scanning a 500 MB file takes seconds. Queue scans asynchronously; mark the upload as "pending scan" and don't expose it to consumers until scanning completes.
 - **Per-customer quotas at the app layer are non-negotiable.** Without them, one over-eager customer can fill your storage. Enforce per-customer monthly upload caps in your application even if the platform has limits at the bucket level.
-- **Pre-signed URLs are scoped â€” make sure scopes are tight.** The pre-signed URL should be issued for a single object key, single HTTP method (PUT), short TTL (15 min), and size-limited (use `Content-Length` constraints in the signed policy). A loose pre-signed URL becomes a "any file, any size, any time" capability.
+- **Pre-signed URLs are scoped — make sure scopes are tight.** The pre-signed URL should be issued for a single object key, single HTTP method (PUT), short TTL (15 min), and size-limited (use `Content-Length` constraints in the signed policy). A loose pre-signed URL becomes a "any file, any size, any time" capability.
 - **CDN body buffering.** Some CDNs buffer the full body before forwarding to origin. Even with chunked uploads from the client, your origin may see a single large request. Check the CDN's documentation; configure streaming pass-through where available.
-- **Health-check vs upload routing.** Route uploads through a separate ingress (NLB â†’ upload service, or dedicated upload subdomain) so they don't compete with your normal API traffic for the same connection pool.
+- **Health-check vs upload routing.** Route uploads through a separate ingress (NLB → upload service, or dedicated upload subdomain) so they don't compete with your normal API traffic for the same connection pool.
 
 ---
 
 ## See also
 
-- [docs/concepts/rate-limiting.md](rate-limiting.md) â€” composite-key pattern relevant to per-customer upload quotas at the edge.
-- [docs/concepts/geoblocking-exceptions.md](geoblocking-exceptions.md) â€” same IP-list + audit-row discipline.
-- [docs/rules/941100.md](../rules/941100.md), [docs/rules/941160.md](../rules/941160.md) â€” bodies past the inspection window where XSS rules silently miss content.
+- [docs/concepts/rate-limiting.md](rate-limiting.md) — composite-key pattern relevant to per-customer upload quotas at the edge.
+- [docs/concepts/geoblocking-exceptions.md](geoblocking-exceptions.md) — same IP-list + audit-row discipline.
+- [docs/rules/941100.md](../rules/941100.md), [docs/rules/941160.md](../rules/941160.md) — bodies past the inspection window where XSS rules silently miss content.
 - [docs/provider-guides/gcp-cloud-armor.md](../provider-guides/gcp-cloud-armor.md), [docs/provider-guides/aws-waf.md](../provider-guides/aws-waf.md), [docs/provider-guides/cloudflare-waf.md](../provider-guides/cloudflare-waf.md)
 - [EXCEPTIONS.md](../../EXCEPTIONS.md)
 
@@ -318,32 +318,32 @@ Two approvers: platform (because it raises infra cost) and secops (because it wi
 
 ### Standards & general
 
-- RFC 9110 Â§15.5.14 (`413 Content Too Large`) â€” [https://datatracker.ietf.org/doc/html/rfc9110#status.413](https://datatracker.ietf.org/doc/html/rfc9110#status.413).
-- RFC 7578 (multipart/form-data) â€” [https://datatracker.ietf.org/doc/html/rfc7578](https://datatracker.ietf.org/doc/html/rfc7578).
-- tus protocol (resumable uploads) â€” [https://tus.io/](https://tus.io/).
+- RFC 9110 §15.5.14 (`413 Content Too Large`) — [https://datatracker.ietf.org/doc/html/rfc9110#status.413](https://datatracker.ietf.org/doc/html/rfc9110#status.413).
+- RFC 7578 (multipart/form-data) — [https://datatracker.ietf.org/doc/html/rfc7578](https://datatracker.ietf.org/doc/html/rfc7578).
+- tus protocol (resumable uploads) — [https://tus.io/](https://tus.io/).
 
 ### Google Cloud Armor
 
-- Tiers & quotas (body inspection availability) â€” [https://cloud.google.com/armor/quotas](https://cloud.google.com/armor/quotas).
-- Cloud Storage signed URLs â€” [https://cloud.google.com/storage/docs/access-control/signed-urls](https://cloud.google.com/storage/docs/access-control/signed-urls).
-- Resumable uploads (Cloud Storage) â€” [https://cloud.google.com/storage/docs/performing-resumable-uploads](https://cloud.google.com/storage/docs/performing-resumable-uploads).
+- Tiers & quotas (body inspection availability) — [https://cloud.google.com/armor/quotas](https://cloud.google.com/armor/quotas).
+- Cloud Storage signed URLs — [https://cloud.google.com/storage/docs/access-control/signed-urls](https://cloud.google.com/storage/docs/access-control/signed-urls).
+- Resumable uploads (Cloud Storage) — [https://cloud.google.com/storage/docs/performing-resumable-uploads](https://cloud.google.com/storage/docs/performing-resumable-uploads).
 
 ### AWS WAF
 
-- `AssociationConfig.RequestBody` (per-resource-type inspection limits) â€” [https://docs.aws.amazon.com/waf/latest/APIReference/API_AssociationConfig.html](https://docs.aws.amazon.com/waf/latest/APIReference/API_AssociationConfig.html).
-- Inspecting request bodies â€” [https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-setting-body-inspection.html](https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-setting-body-inspection.html).
-- S3 pre-signed PUT URLs â€” [https://docs.aws.amazon.com/AmazonS3/latest/userguide/PresignedUrlUploadObject.html](https://docs.aws.amazon.com/AmazonS3/latest/userguide/PresignedUrlUploadObject.html).
-- API Gateway payload limits â€” [https://docs.aws.amazon.com/apigateway/latest/developerguide/limits.html](https://docs.aws.amazon.com/apigateway/latest/developerguide/limits.html).
-- Terraform `aws_wafv2_web_acl` `association_config` â€” [https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/wafv2_web_acl](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/wafv2_web_acl).
+- `AssociationConfig.RequestBody` (per-resource-type inspection limits) — [https://docs.aws.amazon.com/waf/latest/APIReference/API_AssociationConfig.html](https://docs.aws.amazon.com/waf/latest/APIReference/API_AssociationConfig.html).
+- Inspecting request bodies — [https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-setting-body-inspection.html](https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-setting-body-inspection.html).
+- S3 pre-signed PUT URLs — [https://docs.aws.amazon.com/AmazonS3/latest/userguide/PresignedUrlUploadObject.html](https://docs.aws.amazon.com/AmazonS3/latest/userguide/PresignedUrlUploadObject.html).
+- API Gateway payload limits — [https://docs.aws.amazon.com/apigateway/latest/developerguide/limits.html](https://docs.aws.amazon.com/apigateway/latest/developerguide/limits.html).
+- Terraform `aws_wafv2_web_acl` `association_config` — [https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/wafv2_web_acl](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/wafv2_web_acl).
 
 ### Cloudflare
 
-- Cloudflare upload limits (per plan) â€” [https://developers.cloudflare.com/cache/concepts/default-cache-behavior/#cloudflare-response-limits](https://developers.cloudflare.com/cache/concepts/default-cache-behavior/#cloudflare-response-limits).
-- R2 (S3-compatible object storage) pre-signed URLs â€” [https://developers.cloudflare.com/r2/api/s3/presigned-urls/](https://developers.cloudflare.com/r2/api/s3/presigned-urls/).
-- Workers + R2 for streaming uploads â€” [https://developers.cloudflare.com/r2/api/workers/workers-multipart-usage/](https://developers.cloudflare.com/r2/api/workers/workers-multipart-usage/).
+- Cloudflare upload limits (per plan) — [https://developers.cloudflare.com/cache/concepts/default-cache-behavior/#cloudflare-response-limits](https://developers.cloudflare.com/cache/concepts/default-cache-behavior/#cloudflare-response-limits).
+- R2 (S3-compatible object storage) pre-signed URLs — [https://developers.cloudflare.com/r2/api/s3/presigned-urls/](https://developers.cloudflare.com/r2/api/s3/presigned-urls/).
+- Workers + R2 for streaming uploads — [https://developers.cloudflare.com/r2/api/workers/workers-multipart-usage/](https://developers.cloudflare.com/r2/api/workers/workers-multipart-usage/).
 
 ### Anti-virus / content scanning
 
-- ClamAV â€” [https://www.clamav.net/](https://www.clamav.net/).
-- AWS S3 + Lambda + ClamAV reference architecture â€” [https://aws.amazon.com/blogs/developer/virus-scan-s3-buckets-with-a-serverless-clamav-based-cdk-construct/](https://aws.amazon.com/blogs/developer/virus-scan-s3-buckets-with-a-serverless-clamav-based-cdk-construct/).
-- libmagic (MIME sniffing) â€” [https://man7.org/linux/man-pages/man3/libmagic.3.html](https://man7.org/linux/man-pages/man3/libmagic.3.html).
+- ClamAV — [https://www.clamav.net/](https://www.clamav.net/).
+- AWS S3 + Lambda + ClamAV reference architecture — [https://aws.amazon.com/blogs/developer/virus-scan-s3-buckets-with-a-serverless-clamav-based-cdk-construct/](https://aws.amazon.com/blogs/developer/virus-scan-s3-buckets-with-a-serverless-clamav-based-cdk-construct/).
+- libmagic (MIME sniffing) — [https://man7.org/linux/man-pages/man3/libmagic.3.html](https://man7.org/linux/man-pages/man3/libmagic.3.html).

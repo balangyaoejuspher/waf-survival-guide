@@ -1,4 +1,4 @@
-﻿# GCP Cloud Armor â€” Provider Reference
+# GCP Cloud Armor — Provider Reference
 
 > Console click-paths, `gcloud` commands, and Terraform snippets for diagnosing and safely tuning Cloud Armor security policies. Pairs with the concept pages in [../concepts/](../concepts/).
 
@@ -21,7 +21,7 @@ User sees `403 Forbidden`. Response body resembles:
 
 ## 2. The Diagnosis
 
-Cloud Armor sits **in front of** the HTTPS Load Balancer. Enforcement happens at Google's edge. A `DENY` outcome stops the request before it reaches your backend service â€” which is why your app logs are empty.
+Cloud Armor sits **in front of** the HTTPS Load Balancer. Enforcement happens at Google's edge. A `DENY` outcome stops the request before it reaches your backend service — which is why your app logs are empty.
 
 Three enforcement modes you will encounter:
 
@@ -104,7 +104,7 @@ Use when: a specific CRS rule produces FPs on one route and the exact offending 
 
 **Console:**
 
-1. **Network Security â†’ Cloud Armor policies â†’ `<your-policy>` â†’ Add rule**.
+1. **Network Security → Cloud Armor policies → `<your-policy>` → Add rule**.
 2. **Mode:** Advanced mode (CEL).
 3. **Match:** `request.path.matches('/login') && evaluatePreconfiguredWaf('sqli-v33-stable', {'opt_out_rule_ids': ['owasp-crs-v030301-id942100-sqli']})`
 4. **Action:** Allow.
@@ -183,7 +183,7 @@ Supported exclusion targets inside `preconfigured_waf_config.exclusion`:
 
 After 72h of clean preview logs (zero `previewedSecurityPolicy.outcome="DENY"` for the failing service that would have been _prevented_ by the exclusion):
 
-**Console:** edit the rule â†’ uncheck **Preview** â†’ save.
+**Console:** edit the rule → uncheck **Preview** → save.
 
 **Terraform:** flip `preview = false`, `terraform apply`.
 
@@ -206,16 +206,16 @@ Every rule created in Steps A/B above gets a row in [../../EXCEPTIONS.md](../../
 ## Common pitfalls
 
 - **CEL match cost.** Complex CEL expressions are evaluated per-request and have a non-trivial cost; the [Cloud Armor pricing & quotas docs](https://cloud.google.com/armor/quotas) cap rule expression size. Prefer the simpler `preconfigured_waf_config.exclusion` form over hand-rolled CEL when both are options.
-- **Priority ordering.** Cloud Armor evaluates rules in **ascending priority**. Your exclusion rule MUST have a lower priority number than the rule that would otherwise deny â€” otherwise the deny wins first and never reaches the allow.
+- **Priority ordering.** Cloud Armor evaluates rules in **ascending priority**. Your exclusion rule MUST have a lower priority number than the rule that would otherwise deny — otherwise the deny wins first and never reaches the allow.
 - **Two policies on one backend.** Cloud Armor attaches one policy per backend service. If a service has multiple URL maps (e.g. classic + global LB), each has its own backend service and may need the same exclusion applied twice.
-- **Adaptive Protection auto-deploys.** Adaptive Protection can deploy rate-based deny rules **automatically** during a suspected attack. If your false positive coincides with an Adaptive Protection alert, check `jsonPayload.enforcedSecurityPolicy.name` â€” it will be a system-generated name. Tuning is separate from CRS exclusions; see the Adaptive Protection docs.
-- **Preview hits without enforce hits during rollback.** If you remove an exclusion and immediately see `previewedSecurityPolicy.outcome="DENY"` again, the underlying false positive has not gone away â€” that is your signal to keep the exclusion (and bump the **Review by** date on the `EXCEPTIONS.md` row).
+- **Adaptive Protection auto-deploys.** Adaptive Protection can deploy rate-based deny rules **automatically** during a suspected attack. If your false positive coincides with an Adaptive Protection alert, check `jsonPayload.enforcedSecurityPolicy.name` — it will be a system-generated name. Tuning is separate from CRS exclusions; see the Adaptive Protection docs.
+- **Preview hits without enforce hits during rollback.** If you remove an exclusion and immediately see `previewedSecurityPolicy.outcome="DENY"` again, the underlying false positive has not gone away — that is your signal to keep the exclusion (and bump the **Review by** date on the `EXCEPTIONS.md` row).
 
 ---
 
 ## See also
 
 - [../triage/README.md](../triage/README.md)
-- [../concepts/cookie-false-positives.md](../concepts/cookie-false-positives.md) â€” Rule `942100` deep dive.
-- [aws-waf.md](aws-waf.md), [cloudflare-waf.md](cloudflare-waf.md) â€” sibling provider references.
+- [../concepts/cookie-false-positives.md](../concepts/cookie-false-positives.md) — Rule `942100` deep dive.
+- [aws-waf.md](aws-waf.md), [cloudflare-waf.md](cloudflare-waf.md) — sibling provider references.
 - [../../EXCEPTIONS.md](../../EXCEPTIONS.md)

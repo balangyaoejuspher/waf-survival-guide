@@ -1,4 +1,4 @@
-﻿# Cloudflare WAF â€” Provider Reference
+# Cloudflare WAF — Provider Reference
 
 > Stub. Dashboard click-paths, API / Wrangler / `cf-terraforming` snippets for diagnosing and safely tuning Cloudflare's Managed Rulesets and Custom Rules. Expand alongside concrete reproductions.
 
@@ -7,8 +7,8 @@
 ## 1. The Symptom
 
 - `403 Forbidden`, an HTML interstitial branded with `Cloudflare`, error codes like `1010`, `1015`, `1020`, or `Attention Required! | Cloudflare`.
-- `cf-ray` header is present on the response â€” copy it; every Cloudflare log query keys off this.
-- App / origin shows no log entry â€” request was terminated at Cloudflare's edge.
+- `cf-ray` header is present on the response — copy it; every Cloudflare log query keys off this.
+- App / origin shows no log entry — request was terminated at Cloudflare's edge.
 
 ---
 
@@ -17,15 +17,15 @@
 Cloudflare's request pipeline (simplified) for the **firewall** phases:
 
 ```
-http_request_sanitize â”€â”€â–º http_request_firewall_custom â”€â”€â–º http_request_firewall_managed
+http_request_sanitize ──► http_request_firewall_custom ──► http_request_firewall_managed
 ```
 
 | Phase                           | What it does                                                             |
 | ------------------------------- | ------------------------------------------------------------------------ |
-| `http_request_firewall_custom`  | Your zone's custom rules â€” IP lists, geo blocks, custom WAF expressions. |
+| `http_request_firewall_custom`  | Your zone's custom rules — IP lists, geo blocks, custom WAF expressions. |
 | `http_request_firewall_managed` | Cloudflare Managed Ruleset (OWASP CRS + Cloudflare proprietary rules).   |
 
-A request blocked in either phase produces a row in **Security â†’ Events**.
+A request blocked in either phase produces a row in **Security → Events**.
 
 ---
 
@@ -33,13 +33,13 @@ A request blocked in either phase produces a row in **Security â†’ Events**
 
 ### Dashboard
 
-**Security â†’ Events** â†’ filter by:
+**Security → Events** → filter by:
 
 - **Host** (hostname)
 - **Action** (`Block`, `Managed Challenge`, `JS Challenge`, `Log`)
 - **Ray ID** (paste your `cf-ray`)
 
-Expand the matching row â†’ **Match details** shows the matched field and value (if "Log full HTTP request" is enabled on the ruleset).
+Expand the matching row → **Match details** shows the matched field and value (if "Log full HTTP request" is enabled on the ruleset).
 
 ### API (Security Events / Firewall Events)
 
@@ -89,7 +89,7 @@ resource "cloudflare_ruleset" "managed_waf_overrides" {
 }
 ```
 
-After 72h of clean **Security â†’ Events** for the affected route, change `action = "log"` to `action = "skip"` and re-apply.
+After 72h of clean **Security → Events** for the affected route, change `action = "log"` to `action = "skip"` and re-apply.
 
 ### Custom "skip managed rules" rule for finer scoping
 
@@ -115,7 +115,7 @@ resource "cloudflare_ruleset" "skip_managed_for_sessionid" {
 }
 ```
 
-> This skips the **whole managed phase** for matching requests â€” broader than a per-rule override. Use only when the per-rule override is not granular enough, and document the wider scope clearly.
+> This skips the **whole managed phase** for matching requests — broader than a per-rule override. Use only when the per-rule override is not granular enough, and document the wider scope clearly.
 
 ### Wrangler / API for emergency edits
 
@@ -140,7 +140,7 @@ Every override / skip rule lands a row in [../../EXCEPTIONS.md](../../EXCEPTIONS
 
 ## Common pitfalls
 
-- **"Skip" vs "Log" vs "Block" semantics.** `Log` evaluates the rule and records the would-be action without enforcing â€” the preview equivalent. `Skip` bypasses the rule entirely. Don't confuse them; promoting `log` â†’ `skip` is intentional, not automatic.
+- **"Skip" vs "Log" vs "Block" semantics.** `Log` evaluates the rule and records the would-be action without enforcing — the preview equivalent. `Skip` bypasses the rule entirely. Don't confuse them; promoting `log` → `skip` is intentional, not automatic.
 - **Two zones, one hostname.** If a hostname is proxied through a partial-DNS zone and also covered by an account-level ruleset (e.g. for Enterprise customers), overrides at the zone level may not affect the account-level ruleset. Check both.
 - **Ruleset IDs are stable, rule IDs are not always.** Cloudflare's managed-ruleset structure can shift rule IDs across CRS package versions. Pin to the ruleset version in Terraform when stability matters, and re-validate exclusions when bumping the package.
 - **`Cache Reserve` / Edge cache of error responses.** A `403` cached at the edge survives the fix. Purge the affected path after promoting the exclusion.

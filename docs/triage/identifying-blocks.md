@@ -1,6 +1,6 @@
-﻿# Identifying Blocks: App Error vs WAF Block
+# Identifying Blocks: App Error vs WAF Block
 
-> A longer-form decision tree for when [the 5-minute flow](README.md) was inconclusive â€” usually because the symptom is `404` or `5xx` and the response body looks plausibly like your app.
+> A longer-form decision tree for when [the 5-minute flow](README.md) was inconclusive — usually because the symptom is `404` or `5xx` and the response body looks plausibly like your app.
 
 ---
 
@@ -23,7 +23,7 @@ All five have a non-trivial chance of being a WAF, not your code.
 A request to a typical production app crosses **at least four** enforcement points. Knowing which one denied you is the whole game.
 
 ```
-Client â”€â”€â–º CDN/Edge â”€â”€â–º WAF â”€â”€â–º Load Balancer â”€â”€â–º Reverse proxy â”€â”€â–º Your app
+Client ──► CDN/Edge ──► WAF ──► Load Balancer ──► Reverse proxy ──► Your app
                        (1)         (2)              (3)              (4)
 ```
 
@@ -34,7 +34,7 @@ Client â”€â”€â–º CDN/Edge â”€â”€â–º WAF â”€â�
 | (3) Reverse proxy (nginx, Envoy) | maybe an access-log line, no app handler entry             | request reached LB        |
 | (4) Your app                     | full stack trace / handler log                             | request reached LB        |
 
-**Rule of thumb:** if your app log has **no entry at all** for the failing request ID, the request never reached your app â€” and the WAF is the most likely suspect.
+**Rule of thumb:** if your app log has **no entry at all** for the failing request ID, the request never reached your app — and the WAF is the most likely suspect.
 
 ---
 
@@ -42,7 +42,7 @@ Client â”€â”€â–º CDN/Edge â”€â”€â–º WAF â”€â�
 
 Run these three queries with the **same time window and same request identifier** (`X-Request-Id`, `cf-ray`, `X-Amzn-Trace-Id`, or just a 1-minute window if no ID is propagated).
 
-### Query A â€” Did the WAF block it?
+### Query A — Did the WAF block it?
 
 GCP Cloud Armor:
 
@@ -68,9 +68,9 @@ Host: app.example.com
 Path: /your-path
 ```
 
-If **any** row matches â†’ it's a WAF block. Stop here and go to the matching concept page.
+If **any** row matches → it's a WAF block. Stop here and go to the matching concept page.
 
-### Query B â€” Did the load balancer ever see the request as `2xx`?
+### Query B — Did the load balancer ever see the request as `2xx`?
 
 GCP:
 
@@ -90,10 +90,10 @@ WHERE request_url LIKE '%/your-path%'
 ORDER BY time DESC;
 ```
 
-If `elb_status_code = 200` but `target_status_code != 200` â†’ app-side error.
-If `elb_status_code = 403/404` with **no** matching WAF block in Query A â†’ likely a load-balancer ACL or routing issue, not the WAF.
+If `elb_status_code = 200` but `target_status_code != 200` → app-side error.
+If `elb_status_code = 403/404` with **no** matching WAF block in Query A → likely a load-balancer ACL or routing issue, not the WAF.
 
-### Query C â€” Did your app handler run?
+### Query C — Did your app handler run?
 
 Your app log, narrowed to the request ID or the same minute. If empty: request did not reach the app.
 
@@ -101,12 +101,12 @@ Your app log, narrowed to the request ID or the same minute. If empty: request d
 
 | Query A (WAF)   | Query B (LB)                       | Query C (app)             | Verdict                                                                                                                                      |
 | --------------- | ---------------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| BLOCK row found | â€”                                  | empty                     | **WAF block.** Go to [../concepts/](../concepts/) and pick the rule family.                                                                  |
+| BLOCK row found | —                                  | empty                     | **WAF block.** Go to [../concepts/](../concepts/) and pick the rule family.                                                                  |
 | no rows         | `2xx` to client                    | empty                     | LB / routing problem, not WAF, not app. Page the network team.                                                                               |
 | no rows         | `5xx` to client, `2xx` to target   | handler ran, error logged | **Your app.** Debug the stack trace.                                                                                                         |
 | no rows         | `5xx` to client, target also `5xx` | empty                     | Origin / health-check / backend down. Not WAF.                                                                                               |
 | no rows         | `429` to client                    | empty                     | LB-level throttling or upstream rate-limit, not WAF rule. Check [../concepts/rate-limiting.md](../concepts/rate-limiting.md).                |
-| BLOCK row found | â€”                                  | handler also ran          | Rare. Means a _previous_ request was blocked; you correlated the wrong row. Re-run with a tighter time filter and exact `cf-ray`/request id. |
+| BLOCK row found | —                                  | handler also ran          | Rare. Means a _previous_ request was blocked; you correlated the wrong row. Re-run with a tighter time filter and exact `cf-ray`/request id. |
 
 ---
 
@@ -116,9 +116,9 @@ Remediation depends on the verdict, not on the symptom.
 
 | Verdict      | Owner                                        | Action                                                                                                                                                             |
 | ------------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| WAF block    | SecOps / platform team owning the WAF policy | Open a tuning request using the template in [README â€” Step 4](README.md#step-4--file-the-tuning-request-1-minute). Reference the concept page for the rule family. |
+| WAF block    | SecOps / platform team owning the WAF policy | Open a tuning request using the template in [README — Step 4](README.md#step-4--file-the-tuning-request-1-minute). Reference the concept page for the rule family. |
 | LB / routing | Network / platform team                      | File a routing ticket with the LB access-log rows.                                                                                                                 |
-| App          | You                                          | Normal debugging â€” the request reached the app, the log is yours.                                                                                                  |
+| App          | You                                          | Normal debugging — the request reached the app, the log is yours.                                                                                                  |
 | Origin down  | SRE / on-call                                | Page on-call; this is a health issue, not a coding issue.                                                                                                          |
 
 ---
@@ -131,7 +131,7 @@ If the verdict is **WAF block** and a tuning request is approved and applied, th
 
 ## Common gotchas
 
-- **Preview-mode rules don't `BLOCK`** â€” they only log `ALLOW` with a `previewedAction=DENY` (GCP) or `Count` (AWS). If your edge log shows a _preview_ hit, the WAF is **not** the cause of the failing response â€” but it's telling you what would block once promoted to enforce.
+- **Preview-mode rules don't `BLOCK`** — they only log `ALLOW` with a `previewedAction=DENY` (GCP) or `Count` (AWS). If your edge log shows a _preview_ hit, the WAF is **not** the cause of the failing response — but it's telling you what would block once promoted to enforce.
 - **Two WAFs in series** (e.g. Cloudflare in front of AWS WAF). Check **both** edge logs; the outer one will block first and the inner one will see nothing.
 - **Cached error responses.** A CDN can cache a `403` from a brief misconfiguration and keep serving it after the WAF is fixed. Purge the cached path before declaring the fix verified.
 - **HEAD vs GET vs OPTIONS.** Preflight `OPTIONS` failures often have a different rule path than the `POST` they precede. Reproduce with the exact method.

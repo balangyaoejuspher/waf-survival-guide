@@ -1,4 +1,4 @@
-﻿# The 5-Minute Emergency Triage Flow
+# The 5-Minute Emergency Triage Flow
 
 > Production is broken. Browser shows `403` / `404` / `429`. App logs are empty. Use this page before you wake anyone up.
 
@@ -6,7 +6,7 @@ The goal: in **5 minutes**, decide whether the cause is **(A) your application c
 
 ---
 
-## Step 0 â€” Capture one good reproduction (30 seconds)
+## Step 0 — Capture one good reproduction (30 seconds)
 
 Do this once. Every later step depends on it.
 
@@ -24,12 +24,12 @@ From `/tmp/trace.txt`, write down:
 | --- | --- |
 | HTTP status | `< HTTP/2 403` |
 | `X-Request-Id` / `X-Amzn-Trace-Id` / `cf-ray` | `< x-request-id: ...` |
-| `server:` header | `< server: ...` (often reveals the WAF â€” `cloudflare`, `awselb/2.0`, `Google Frontend`) |
-| Response body | `/tmp/body.txt` â€” WAFs frequently serve a branded HTML block page |
+| `server:` header | `< server: ...` (often reveals the WAF — `cloudflare`, `awselb/2.0`, `Google Frontend`) |
+| Response body | `/tmp/body.txt` — WAFs frequently serve a branded HTML block page |
 
 ---
 
-## Step 1 â€” Is the response shape "WAF-shaped"? (30 seconds)
+## Step 1 — Is the response shape "WAF-shaped"? (30 seconds)
 
 | Signal | Verdict |
 | --- | --- |
@@ -38,13 +38,13 @@ From `/tmp/trace.txt`, write down:
 | `Server: awselb/2.0` + tiny generic body + `403` | AWS WAF |
 | Body says "Your client does not have permission..." / `Google Frontend` server | GCP Cloud Armor |
 | `429` with `Retry-After` header but **no** request reached your app log | WAF rate-limit, not your app's rate limiter |
-| Body matches your app's normal error envelope (e.g. your own JSON error schema) | Your app â€” go fix code |
+| Body matches your app's normal error envelope (e.g. your own JSON error schema) | Your app — go fix code |
 
 If two or more rows above are true, treat it as a WAF block and continue.
 
 ---
 
-## Step 2 â€” Pull the edge log (2 minutes)
+## Step 2 — Pull the edge log (2 minutes)
 
 The request never hit your container; **do not look at app logs**. Look at the edge.
 
@@ -74,7 +74,7 @@ Look for: `terminatingRuleId` (e.g. `AWS-AWSManagedRulesCommonRuleSet`), `termin
 
 ### Cloudflare (Logpush / Firewall Events API)
 
-Dashboard â†’ **Security â†’ Events** â†’ filter by host + URI + timestamp.
+Dashboard → **Security → Events** → filter by host + URI + timestamp.
 Or via API:
 
 ```bash
@@ -86,19 +86,19 @@ Look for: `rule_id`, `rule_message`, `action: block`, `ray_id` (matches your `cf
 
 ---
 
-## Step 3 â€” Map the rule ID to a concept page (1 minute)
+## Step 3 — Map the rule ID to a concept page (1 minute)
 
 | Rule family | Engine / behavior | Deep dive |
 | --- | --- | --- |
-| `942xxx` (e.g. `942100`, `942130`, `942260`) | SQL injection via `libinjection` â€” triggers on cookies / JWTs / base64 blobs | [../concepts/cookie-false-positives.md](../concepts/cookie-false-positives.md) |
-| `941xxx` (e.g. `941100`, `941160`, `941310`) | XSS â€” triggers on HTML/JS in request bodies, common with WYSIWYG editors | [../concepts/xss-rich-text.md](../concepts/xss-rich-text.md) |
-| `913xxx` | Scanner detection â€” uncommon false positive | provider page |
+| `942xxx` (e.g. `942100`, `942130`, `942260`) | SQL injection via `libinjection` — triggers on cookies / JWTs / base64 blobs | [../concepts/cookie-false-positives.md](../concepts/cookie-false-positives.md) |
+| `941xxx` (e.g. `941100`, `941160`, `941310`) | XSS — triggers on HTML/JS in request bodies, common with WYSIWYG editors | [../concepts/xss-rich-text.md](../concepts/xss-rich-text.md) |
+| `913xxx` | Scanner detection — uncommon false positive | provider page |
 | Rate-limit rule (provider-specific ID) | Token bucket exhausted | [../concepts/rate-limiting.md](../concepts/rate-limiting.md) |
 | Custom rule by your SecOps team | Org-specific deny list | provider page + ask SecOps |
 
 ---
 
-## Step 4 â€” File the tuning request (1 minute)
+## Step 4 — File the tuning request (1 minute)
 
 Open a ticket / PR with these fields filled in. Anything less will bounce.
 
@@ -114,19 +114,19 @@ Open a ticket / PR with these fields filled in. Anything less will bounce.
 **Rollout:** preview mode for 72h, then enforce; review +180d
 ```
 
-Send to the team that owns the WAF policy. Do **not** ask for "disable rule 942100" â€” that PR will be rejected.
+Send to the team that owns the WAF policy. Do **not** ask for "disable rule 942100" — that PR will be rejected.
 
 ---
 
 ## What "5 minutes" looks like in practice
 
 ```
-0:00  Step 0 â€” reproduce with curl -v
-0:30  Step 1 â€” is response body WAF-shaped?
-1:00  Step 2 â€” open edge log console, paste query
-3:00  Step 2 â€” find the log row, copy rule ID + cf-ray / request-id
-4:00  Step 3 â€” open the concept page for that rule family
-5:00  Step 4 â€” draft the tuning request from the template
+0:00  Step 0 — reproduce with curl -v
+0:30  Step 1 — is response body WAF-shaped?
+1:00  Step 2 — open edge log console, paste query
+3:00  Step 2 — find the log row, copy rule ID + cf-ray / request-id
+4:00  Step 3 — open the concept page for that rule family
+5:00  Step 4 — draft the tuning request from the template
 ```
 
 If you are still in app logs at the 5-minute mark, you are looking in the wrong place.
@@ -135,7 +135,7 @@ If you are still in app logs at the 5-minute mark, you are looking in the wrong 
 
 ## What NOT to do
 
-- **Do not** retry-loop the request. Many WAFs have an escalating rate-limit on denied requests â€” you will lock yourself out and make the symptom look like a rate-limit problem.
+- **Do not** retry-loop the request. Many WAFs have an escalating rate-limit on denied requests — you will lock yourself out and make the symptom look like a rate-limit problem.
 - **Do not** ask for the rule group to be disabled. Always tune by **target exclusion** + **preview mode**. See the house rule in the root [README](../../README.md).
 - **Do not** paste the raw failing cookie / JWT into a public ticket. Use the redaction checklist in `.github/CONTRIBUTING.md`.
 
@@ -143,6 +143,6 @@ If you are still in app logs at the 5-minute mark, you are looking in the wrong 
 
 ## See also
 
-- [identifying-blocks.md](identifying-blocks.md) â€” deeper "is it the app or the WAF?" decision tree.
-- [../provider-guides/gcp-cloud-armor.md](../provider-guides/gcp-cloud-armor.md) â€” console click-paths + Terraform for exclusions.
-- [../../EXCEPTIONS.md](../../EXCEPTIONS.md) â€” where the approved exclusion gets logged.
+- [identifying-blocks.md](identifying-blocks.md) — deeper "is it the app or the WAF?" decision tree.
+- [../provider-guides/gcp-cloud-armor.md](../provider-guides/gcp-cloud-armor.md) — console click-paths + Terraform for exclusions.
+- [../../EXCEPTIONS.md](../../EXCEPTIONS.md) — where the approved exclusion gets logged.

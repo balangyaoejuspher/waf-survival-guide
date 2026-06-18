@@ -1,6 +1,6 @@
-﻿# CI/CD Infrastructure Integration â€” Managing WAF Tunings via GitOps
+# CI/CD Infrastructure Integration — Managing WAF Tunings via GitOps
 
-> **Scope of this file:** how to manage WAF policies â€” preconfigured rule exclusions, custom rules, IP sets, rate-limit configurations, anomaly-scoring thresholds â€” through GitOps pipelines using Terraform / CloudFormation / Pulumi / Wrangler, with mandatory CI checks (plan diffs, policy linting, audit-row enforcement, change-window guards), staged rollouts (preview â†’ enforce gates), drift detection, secret handling, and rollback procedures. Covers Google Cloud Armor, AWS WAF, and Cloudflare side by side.
+> **Scope of this file:** how to manage WAF policies — preconfigured rule exclusions, custom rules, IP sets, rate-limit configurations, anomaly-scoring thresholds — through GitOps pipelines using Terraform / CloudFormation / Pulumi / Wrangler, with mandatory CI checks (plan diffs, policy linting, audit-row enforcement, change-window guards), staged rollouts (preview → enforce gates), drift detection, secret handling, and rollback procedures. Covers Google Cloud Armor, AWS WAF, and Cloudflare side by side.
 
 ---
 
@@ -16,68 +16,68 @@
 | Rule order matters (priority), but two PRs that both add priority-100 rules collide silently | Merge wins, priority duplication, undefined evaluation order |
 | Secrets (API keys for partner allow lists, signing secrets for custom rules) end up in code | Credential leak risk |
 
-GitOps for WAF policy fixes all of these â€” at the cost of upfront tooling discipline.
+GitOps for WAF policy fixes all of these — at the cost of upfront tooling discipline.
 
 ---
 
 ## 2. The architecture
 
 ```
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚ Git repo: waf-policy/                                      â”‚
-â”‚   modules/                  Reusable per-provider modules  â”‚
-â”‚   envs/                                                     â”‚
-â”‚     prod/                   Per-environment instantiation  â”‚
-â”‚     staging/                                                â”‚
-â”‚     dev/                                                    â”‚
-â”‚   ip-sets/                  IP lists pulled from vendors    â”‚
-â”‚   policies/                  YAML or HCL policy definitions â”‚
-â”‚   EXCEPTIONS.md             Audit ledger (this repo's root)â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-              â”‚
-              â”‚ Pull request
+┌────────────────────────────────────────────────────────────┐
+│ Git repo: waf-policy/                                      │
+│   modules/                  Reusable per-provider modules  │
+│   envs/                                                     │
+│     prod/                   Per-environment instantiation  │
+│     staging/                                                │
+│     dev/                                                    │
+│   ip-sets/                  IP lists pulled from vendors    │
+│   policies/                  YAML or HCL policy definitions │
+│   EXCEPTIONS.md             Audit ledger (this repo's root)│
+└────────────────────────────────────────────────────────────┘
+              │
+              │ Pull request
               â–¼
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚ CI pipeline (GitHub Actions / GitLab CI / similar)         â”‚
-â”‚                                                             â”‚
-â”‚  1. terraform fmt + validate                                â”‚
-â”‚  2. tflint / cfn-lint / wrangler check                      â”‚
-â”‚  3. Custom: lint rule priorities (no duplicates)            â”‚
-â”‚  4. Custom: lint EXCEPTIONS.md (every new rule = new row)   â”‚
-â”‚  5. Custom: lint description fields reference EXCEPTIONS rowâ”‚
-â”‚  6. terraform plan (staging)                                â”‚
-â”‚  7. Apply on merge to main (staging auto, prod gated)       â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-              â”‚
-              â”‚ Apply
+┌────────────────────────────────────────────────────────────┐
+│ CI pipeline (GitHub Actions / GitLab CI / similar)         │
+│                                                             │
+│  1. terraform fmt + validate                                │
+│  2. tflint / cfn-lint / wrangler check                      │
+│  3. Custom: lint rule priorities (no duplicates)            │
+│  4. Custom: lint EXCEPTIONS.md (every new rule = new row)   │
+│  5. Custom: lint description fields reference EXCEPTIONS row│
+│  6. terraform plan (staging)                                │
+│  7. Apply on merge to main (staging auto, prod gated)       │
+└────────────────────────────────────────────────────────────┘
+              │
+              │ Apply
               â–¼
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚ Cloud (GCP Cloud Armor / AWS WAF / Cloudflare)             â”‚
-â”‚   Policy enforced; events flow to log destination          â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-              â”‚
-              â”‚ Drift detection (nightly cron)
+┌────────────────────────────────────────────────────────────┐
+│ Cloud (GCP Cloud Armor / AWS WAF / Cloudflare)             │
+│   Policy enforced; events flow to log destination          │
+└────────────────────────────────────────────────────────────┘
+              │
+              │ Drift detection (nightly cron)
               â–¼
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚ Drift CI job: terraform plan -refresh-only                  â”‚
-â”‚   Fails CI if console-edits introduced state drift         â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+┌────────────────────────────────────────────────────────────┐
+│ Drift CI job: terraform plan -refresh-only                  │
+│   Fails CI if console-edits introduced state drift         │
+└────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## 3. Per-provider tooling
 
-### 3.1 Google Cloud Armor â€” Terraform + `gcloud`
+### 3.1 Google Cloud Armor — Terraform + `gcloud`
 
 **Module layout:**
 
 ```
 modules/cloud-armor-policy/
-â”œâ”€â”€ main.tf              # google_compute_security_policy + rules
-â”œâ”€â”€ variables.tf         # exclusions, rate limits, custom rules as inputs
-â”œâ”€â”€ outputs.tf           # policy ID for attachment
-â””â”€â”€ README.md            # contract: what inputs do
+├── main.tf              # google_compute_security_policy + rules
+├── variables.tf         # exclusions, rate limits, custom rules as inputs
+├── outputs.tf           # policy ID for attachment
+└── README.md            # contract: what inputs do
 ```
 
 **Per-env instantiation:**
@@ -125,16 +125,16 @@ module "app_armor" {
 terraform plan -refresh-only -detailed-exitcode  # exit 2 if drift
 ```
 
-### 3.2 AWS WAF â€” Terraform + `aws wafv2`
+### 3.2 AWS WAF — Terraform + `aws wafv2`
 
 **Module layout:**
 
 ```
 modules/waf-acl/
-â”œâ”€â”€ main.tf              # aws_wafv2_web_acl + ip_sets + regex_pattern_sets
-â”œâ”€â”€ variables.tf
-â”œâ”€â”€ outputs.tf
-â””â”€â”€ README.md
+├── main.tf              # aws_wafv2_web_acl + ip_sets + regex_pattern_sets
+├── variables.tf
+├── outputs.tf
+└── README.md
 ```
 
 **Per-env:**
@@ -202,17 +202,17 @@ module "api_acl" {
 }
 ```
 
-### 3.3 Cloudflare â€” Terraform (preferred) or Wrangler
+### 3.3 Cloudflare — Terraform (preferred) or Wrangler
 
 **Module layout:**
 
 ```
 modules/cloudflare-zone-waf/
-â”œâ”€â”€ main.tf                      # cloudflare_ruleset(s) per phase
-â”œâ”€â”€ ip-lists.tf                  # cloudflare_list resources
-â”œâ”€â”€ variables.tf
-â”œâ”€â”€ outputs.tf
-â””â”€â”€ README.md
+├── main.tf                      # cloudflare_ruleset(s) per phase
+├── ip-lists.tf                  # cloudflare_list resources
+├── variables.tf
+├── outputs.tf
+└── README.md
 ```
 
 **Per-env:**
@@ -409,7 +409,7 @@ Drift = someone console-edited. Issue gets opened automatically; on-call reconci
 
 ---
 
-## 5. Staged rollout: preview â†’ enforce
+## 5. Staged rollout: preview → enforce
 
 The standard pipeline:
 
@@ -418,10 +418,10 @@ The standard pipeline:
 | 1. PR opened | Linters run, plan generated, audit row review starts | GitHub PR |
 | 2. Merge to main | Apply to **dev** with `preview = true` | dev environment |
 | 3. 7-day soak | Monitor preview hits in dev; tune contributors | Logs Explorer / CloudWatch / Security Events |
-| 4. Promote to staging | PR flips `preview = true â†’ false` for that rule in staging; apply | staging environment |
+| 4. Promote to staging | PR flips `preview = true → false` for that rule in staging; apply | staging environment |
 | 5. 72-hour soak in staging | Monitor enforce mode behavior | Same dashboards as dev |
-| 6. Promote to prod | PR flips `preview = true â†’ false` in prod; manual-approval gate | prod environment |
-| 7. Update audit row | `Preview YYYY-MM-DD â†’ Enforce YYYY-MM-DD` updated in same PR | EXCEPTIONS.md |
+| 6. Promote to prod | PR flips `preview = true → false` in prod; manual-approval gate | prod environment |
+| 7. Update audit row | `Preview YYYY-MM-DD → Enforce YYYY-MM-DD` updated in same PR | EXCEPTIONS.md |
 
 Implement the staged-flag toggle in module inputs:
 
@@ -447,7 +447,7 @@ WAF policies often reference partner API keys, signing keys, allow-listed JWT su
 
 | Provider | Secret store | Reference pattern |
 | --- | --- | --- |
-| **GCP** | Secret Manager | `data "google_secret_manager_secret_version" "key" { ... }` â†’ use the value in `request.headers['x-internal-api-key'] == data.google_secret_manager_secret_version.key.secret_data` |
+| **GCP** | Secret Manager | `data "google_secret_manager_secret_version" "key" { ... }` → use the value in `request.headers['x-internal-api-key'] == data.google_secret_manager_secret_version.key.secret_data` |
 | **AWS** | Secrets Manager / SSM Parameter Store | `data "aws_secretsmanager_secret_version" ...` |
 | **Cloudflare** | No built-in secret store for rules; use **Workers Secrets** or a vault accessed at plan time | `data "vault_generic_secret" ...` |
 
@@ -480,7 +480,7 @@ resource "aws_wafv2_ip_set" "cdn_passthrough" {
 | --- | --- |
 | Added an exclusion rule | Revert the PR; `terraform apply` removes the rule. |
 | Bumped a threshold | Revert the PR. |
-| Promoted preview â†’ enforce and saw immediate FP storm | Re-flip enforce â†’ preview via single PR + apply (typically < 5 minutes end-to-end). |
+| Promoted preview → enforce and saw immediate FP storm | Re-flip enforce → preview via single PR + apply (typically < 5 minutes end-to-end). |
 | Updated an IP set with new partner CIDRs that turned out to be hostile | Revert IP-set change. |
 
 **Harder to rollback:**
@@ -512,13 +512,13 @@ The PR uses preview = false directly (no soak), gated on an emergency-approver g
 
 ## 8. Common pitfalls
 
-- **Console edits during incidents.** They feel fast but break the GitOps state. Always make the change via PR â€” if the incident is critical, the emergency-bypass PR template above takes ~5 minutes; not slower than console + retroactive sync.
+- **Console edits during incidents.** They feel fast but break the GitOps state. Always make the change via PR — if the incident is critical, the emergency-bypass PR template above takes ~5 minutes; not slower than console + retroactive sync.
 - **One Terraform state for all environments.** Disaster recipe. Per-env state files (or workspaces) keep blast radius contained.
-- **Apply via long-lived admin credentials.** Use short-lived OIDC-federated tokens from CI (GitHub Actions OIDC â†’ GCP / AWS / Cloudflare). Service-account JSON keys checked into the repo or env-files are credential-leak vectors.
+- **Apply via long-lived admin credentials.** Use short-lived OIDC-federated tokens from CI (GitHub Actions OIDC → GCP / AWS / Cloudflare). Service-account JSON keys checked into the repo or env-files are credential-leak vectors.
 - **Skipping the audit-row check because "it's just a small change".** Small changes accumulate. Without the check, after 12 months you have a few hundred undocumented rules.
-- **No drift detection.** Without it, console edits and Terraform diverge silently. Plan output starts showing "drift" results as a normal noisy state and the team learns to ignore them â€” defeating the GitOps premise.
+- **No drift detection.** Without it, console edits and Terraform diverge silently. Plan output starts showing "drift" results as a normal noisy state and the team learns to ignore them — defeating the GitOps premise.
 - **IP-list refresh via manual paste.** Vendor IP lists change. Pull them from the vendor's API at plan time, or via a scheduled CI job that opens an auto-PR.
-- **Same priority numbers across PRs.** Use a reserved-priority-band convention per change type (e.g. 1â€“99 emergency, 100â€“199 partner allows, 200â€“499 rate limits, 500â€“999 geoblocks, 1000â€“1999 managed-rule exclusions, etc.); document the reservation in the module README.
+- **Same priority numbers across PRs.** Use a reserved-priority-band convention per change type (e.g. 1–99 emergency, 100–199 partner allows, 200–499 rate limits, 500–999 geoblocks, 1000–1999 managed-rule exclusions, etc.); document the reservation in the module README.
 - **No replay-with-policy testing.** When you change a rule, replay a small set of representative legitimate AND attack requests through the new policy in preview. Many "looked right in plan" rules behave differently than expected on real traffic.
 - **Forgetting that managed-rule-group versions update.** AWS / Cloudflare / GCP can update the underlying rule sets on their own cadence. Pin to specific versions where supported; subscribe to vendor change notifications for the rest.
 - **Rate-limit costs.** Cloudflare Rate Limit rules are paid features; provisioning many "for safety" can produce a bill surprise. Audit rate-rule count per env and remove inactive ones.
@@ -531,31 +531,31 @@ A practical starting layout:
 
 ```
 waf-policy/
-â”œâ”€â”€ .github/workflows/
-â”‚   â”œâ”€â”€ ci.yml                  # fmt + validate + lint + plan on PR
-â”‚   â”œâ”€â”€ apply-dev.yml            # auto-apply on merge
-â”‚   â”œâ”€â”€ apply-staging.yml        # apply on tag
-â”‚   â”œâ”€â”€ apply-prod.yml           # apply on tag + manual approval
-â”‚   â””â”€â”€ drift.yml                # nightly drift check
-â”œâ”€â”€ .ci/
-â”‚   â”œâ”€â”€ lint-rule-priorities.py
-â”‚   â”œâ”€â”€ lint-audit-rows.sh
-â”‚   â””â”€â”€ audit-row-freshness.sh
-â”œâ”€â”€ modules/
-â”‚   â”œâ”€â”€ cloud-armor-policy/
-â”‚   â”œâ”€â”€ waf-acl/
-â”‚   â””â”€â”€ cloudflare-zone-waf/
-â”œâ”€â”€ envs/
-â”‚   â”œâ”€â”€ dev/{main.tf, terraform.tfvars}
-â”‚   â”œâ”€â”€ staging/{main.tf, terraform.tfvars}
-â”‚   â””â”€â”€ prod/{main.tf, terraform.tfvars}
-â”œâ”€â”€ ip-lists/
-â”‚   â”œâ”€â”€ stripe.txt             # refreshed via cron PR
-â”‚   â”œâ”€â”€ twilio.txt
-â”‚   â””â”€â”€ cdn-passthrough.txt
-â”œâ”€â”€ EXCEPTIONS.md               # audit ledger
-â”œâ”€â”€ README.md                    # repo intro
-â””â”€â”€ CODEOWNERS                   # require secops + platform on changes
+├── .github/workflows/
+│   ├── ci.yml                  # fmt + validate + lint + plan on PR
+│   ├── apply-dev.yml            # auto-apply on merge
+│   ├── apply-staging.yml        # apply on tag
+│   ├── apply-prod.yml           # apply on tag + manual approval
+│   └── drift.yml                # nightly drift check
+├── .ci/
+│   ├── lint-rule-priorities.py
+│   ├── lint-audit-rows.sh
+│   └── audit-row-freshness.sh
+├── modules/
+│   ├── cloud-armor-policy/
+│   ├── waf-acl/
+│   └── cloudflare-zone-waf/
+├── envs/
+│   ├── dev/{main.tf, terraform.tfvars}
+│   ├── staging/{main.tf, terraform.tfvars}
+│   └── prod/{main.tf, terraform.tfvars}
+├── ip-lists/
+│   ├── stripe.txt             # refreshed via cron PR
+│   ├── twilio.txt
+│   └── cdn-passthrough.txt
+├── EXCEPTIONS.md               # audit ledger
+├── README.md                    # repo intro
+└── CODEOWNERS                   # require secops + platform on changes
 ```
 
 `CODEOWNERS` example:
@@ -573,10 +573,10 @@ modules/  @platform-lead
 
 ## See also
 
-- [docs/concepts/rate-limiting.md](../concepts/rate-limiting.md), [docs/concepts/geoblocking-exceptions.md](../concepts/geoblocking-exceptions.md), [docs/concepts/payload-size.md](../concepts/payload-size.md) â€” concrete policies that GitOps manages.
-- [docs/advanced/anomaly-scoring.md](anomaly-scoring.md), [docs/advanced/custom-expressions.md](custom-expressions.md) â€” rule-content patterns that flow through the same pipeline.
-- All [docs/rules/*.md](../rules/) pages â€” each has Terraform snippets that drop directly into the per-env modules.
-- [EXCEPTIONS.md](../../EXCEPTIONS.md) â€” the ledger that the audit-row linter enforces.
+- [docs/concepts/rate-limiting.md](../concepts/rate-limiting.md), [docs/concepts/geoblocking-exceptions.md](../concepts/geoblocking-exceptions.md), [docs/concepts/payload-size.md](../concepts/payload-size.md) — concrete policies that GitOps manages.
+- [docs/advanced/anomaly-scoring.md](anomaly-scoring.md), [docs/advanced/custom-expressions.md](custom-expressions.md) — rule-content patterns that flow through the same pipeline.
+- All [docs/rules/*.md](../rules/) pages — each has Terraform snippets that drop directly into the per-env modules.
+- [EXCEPTIONS.md](../../EXCEPTIONS.md) — the ledger that the audit-row linter enforces.
 
 ---
 
@@ -584,28 +584,28 @@ modules/  @platform-lead
 
 ### Terraform
 
-- HashiCorp Terraform â€” [https://developer.hashicorp.com/terraform](https://developer.hashicorp.com/terraform).
-- Google provider â€” [https://registry.terraform.io/providers/hashicorp/google/latest](https://registry.terraform.io/providers/hashicorp/google/latest).
-- AWS provider â€” [https://registry.terraform.io/providers/hashicorp/aws/latest](https://registry.terraform.io/providers/hashicorp/aws/latest).
-- Cloudflare provider â€” [https://registry.terraform.io/providers/cloudflare/cloudflare/latest](https://registry.terraform.io/providers/cloudflare/cloudflare/latest).
-- `terraform plan -refresh-only` â€” [https://developer.hashicorp.com/terraform/cli/commands/plan#planning-modes](https://developer.hashicorp.com/terraform/cli/commands/plan#planning-modes).
+- HashiCorp Terraform — [https://developer.hashicorp.com/terraform](https://developer.hashicorp.com/terraform).
+- Google provider — [https://registry.terraform.io/providers/hashicorp/google/latest](https://registry.terraform.io/providers/hashicorp/google/latest).
+- AWS provider — [https://registry.terraform.io/providers/hashicorp/aws/latest](https://registry.terraform.io/providers/hashicorp/aws/latest).
+- Cloudflare provider — [https://registry.terraform.io/providers/cloudflare/cloudflare/latest](https://registry.terraform.io/providers/cloudflare/cloudflare/latest).
+- `terraform plan -refresh-only` — [https://developer.hashicorp.com/terraform/cli/commands/plan#planning-modes](https://developer.hashicorp.com/terraform/cli/commands/plan#planning-modes).
 
 ### CI / OIDC federation
 
-- GitHub Actions OIDC for cloud providers â€” [https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect).
-- GCP Workload Identity Federation â€” [https://cloud.google.com/iam/docs/workload-identity-federation](https://cloud.google.com/iam/docs/workload-identity-federation).
-- AWS IAM Identity Provider for GitHub Actions â€” [https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_create_oidc.html](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_create_oidc.html).
-- Cloudflare API tokens (least-privilege for Terraform) â€” [https://developers.cloudflare.com/fundamentals/api/get-started/create-token/](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/).
+- GitHub Actions OIDC for cloud providers — [https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect).
+- GCP Workload Identity Federation — [https://cloud.google.com/iam/docs/workload-identity-federation](https://cloud.google.com/iam/docs/workload-identity-federation).
+- AWS IAM Identity Provider for GitHub Actions — [https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_create_oidc.html](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_create_oidc.html).
+- Cloudflare API tokens (least-privilege for Terraform) — [https://developers.cloudflare.com/fundamentals/api/get-started/create-token/](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/).
 
 ### CloudFormation / Pulumi / Wrangler alternatives
 
-- AWS CloudFormation for WAFv2 â€” [https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-wafv2-webacl.html](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-wafv2-webacl.html).
-- Pulumi WAF examples â€” [https://www.pulumi.com/registry/](https://www.pulumi.com/registry/).
-- Cloudflare Wrangler (Workers / Pages, limited WAF coverage) â€” [https://developers.cloudflare.com/workers/wrangler/](https://developers.cloudflare.com/workers/wrangler/).
+- AWS CloudFormation for WAFv2 — [https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-wafv2-webacl.html](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-wafv2-webacl.html).
+- Pulumi WAF examples — [https://www.pulumi.com/registry/](https://www.pulumi.com/registry/).
+- Cloudflare Wrangler (Workers / Pages, limited WAF coverage) — [https://developers.cloudflare.com/workers/wrangler/](https://developers.cloudflare.com/workers/wrangler/).
 
 ### Policy as code adjacent
 
-- OPA / Conftest for Terraform policy enforcement â€” [https://www.openpolicyagent.org/docs/latest/terraform/](https://www.openpolicyagent.org/docs/latest/terraform/).
-- HashiCorp Sentinel â€” [https://developer.hashicorp.com/sentinel](https://developer.hashicorp.com/sentinel).
-- tflint â€” [https://github.com/terraform-linters/tflint](https://github.com/terraform-linters/tflint).
-- cfn-lint â€” [https://github.com/aws-cloudformation/cfn-lint](https://github.com/aws-cloudformation/cfn-lint).
+- OPA / Conftest for Terraform policy enforcement — [https://www.openpolicyagent.org/docs/latest/terraform/](https://www.openpolicyagent.org/docs/latest/terraform/).
+- HashiCorp Sentinel — [https://developer.hashicorp.com/sentinel](https://developer.hashicorp.com/sentinel).
+- tflint — [https://github.com/terraform-linters/tflint](https://github.com/terraform-linters/tflint).
+- cfn-lint — [https://github.com/aws-cloudformation/cfn-lint](https://github.com/aws-cloudformation/cfn-lint).

@@ -1,6 +1,6 @@
-﻿# Geoblocking Exceptions â€” Multi-Region CDNs and Localized Third-Party APIs
+# Geoblocking Exceptions — Multi-Region CDNs and Localized Third-Party APIs
 
-> **Scope of this file:** how to write geoblock rules that protect against high-risk-country traffic without false-positiving legitimate edge-cached requests from multi-region CDNs (Cloudflare â†’ your origin, Akamai â†’ your origin), localized third-party API consumers (Stripe webhooks from country-specific PoPs, Twilio callbacks, payment-network confirmations), traveling employees on VPNs, and federated partners whose traffic egresses through unexpected regions. Covers Google Cloud Armor, AWS WAF, and Cloudflare side by side.
+> **Scope of this file:** how to write geoblock rules that protect against high-risk-country traffic without false-positiving legitimate edge-cached requests from multi-region CDNs (Cloudflare → your origin, Akamai → your origin), localized third-party API consumers (Stripe webhooks from country-specific PoPs, Twilio callbacks, payment-network confirmations), traveling employees on VPNs, and federated partners whose traffic egresses through unexpected regions. Covers Google Cloud Armor, AWS WAF, and Cloudflare side by side.
 
 ---
 
@@ -9,10 +9,10 @@
 | Cross-provider signature                                                                                                                                            | Where you see it                                      |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
 | `HTTP 403` returned only to users in specific countries; the response body or error code identifies the geoblock rule                                               | Customer support ticket "site is broken in [country]" |
-| Legitimate webhook deliveries from a SaaS partner fail intermittently â€” partner serves from multiple regions and the failing deliveries come from "unexpected" PoPs | Partner-side webhook retry queue                      |
+| Legitimate webhook deliveries from a SaaS partner fail intermittently — partner serves from multiple regions and the failing deliveries come from "unexpected" PoPs | Partner-side webhook retry queue                      |
 | CDN-to-origin pulls failing: your origin geoblocks "anything outside US" but Akamai's pulling edge nodes are in Asia                                                | Origin access log                                     |
 | Internal employee on VPN gets blocked because the VPN exit is in a country on the geoblock list                                                                     | Employee support                                      |
-| Payment-network confirmation traffic (3-D Secure, ACS callbacks) fails intermittently â€” bank's PoP is in a "high risk" country per your geoblock                    | Payments-team alerts                                  |
+| Payment-network confirmation traffic (3-D Secure, ACS callbacks) fails intermittently — bank's PoP is in a "high risk" country per your geoblock                    | Payments-team alerts                                  |
 | A federated identity provider's token-validation endpoint can't reach your callback URL because their authorization service is in a different country               | OAuth flow break                                      |
 
 Distinguishing fingerprint: the failing requests originate from one or a small set of countries, and the source IP is **legitimate infrastructure** (a CDN PoP, a partner's edge, a VPN exit), not an end-user.
@@ -35,9 +35,9 @@ Three operational implications:
 
 | Source                                         | Why it falls in an unexpected country                                                                                                                                                                         |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cloudflare â†’ origin pull                       | Cloudflare's pulling edge is the nearest to your origin, which may be in any country Cloudflare has a PoP in. Your origin sees `162.158.x.x` (Cloudflare range), GeoIP attributes it to wherever that PoP is. |
-| Akamai â†’ origin pull                           | Same model. Akamai publishes its origin-pull IP ranges; they span multiple continents.                                                                                                                        |
-| Fastly â†’ origin pull                           | Same. Fastly publishes IP ranges per PoP.                                                                                                                                                                     |
+| Cloudflare → origin pull                       | Cloudflare's pulling edge is the nearest to your origin, which may be in any country Cloudflare has a PoP in. Your origin sees `162.158.x.x` (Cloudflare range), GeoIP attributes it to wherever that PoP is. |
+| Akamai → origin pull                           | Same model. Akamai publishes its origin-pull IP ranges; they span multiple continents.                                                                                                                        |
+| Fastly → origin pull                           | Same. Fastly publishes IP ranges per PoP.                                                                                                                                                                     |
 | Stripe webhooks                                | Stripe serves webhooks from multi-region infrastructure. Their published IP list spans 8+ countries.                                                                                                          |
 | Twilio callbacks                               | Same.                                                                                                                                                                                                         |
 | GitHub Actions runners                         | GitHub-hosted runners are primarily in `us-east-1` but can spill to other regions.                                                                                                                            |
@@ -50,7 +50,7 @@ Three operational implications:
 1. **Allow-list a small set of countries.** "Only allow US, CA, UK" sounds safe but breaks any partner / CDN / VPN traffic from anywhere else, including legitimate users traveling. Hard to maintain.
 2. **Deny-list "high-risk" countries.** "Block CN, RU, KP, IR" is more permissive but still breaks legitimate users from those countries (research collaborators, customers, journalists) and third-party traffic legitimately routed through those regions.
 
-The correct default for most B2B SaaS: **don't blanket-geoblock at the edge.** Geoblock by **path** (e.g. block country X only on `/admin/*`), by **risk** (compounded with bot-management signals), or by **per-customer policy** (compliance / sanctions list â€” applied at the application layer, not the WAF).
+The correct default for most B2B SaaS: **don't blanket-geoblock at the edge.** Geoblock by **path** (e.g. block country X only on `/admin/*`), by **risk** (compounded with bot-management signals), or by **per-customer policy** (compliance / sanctions list — applied at the application layer, not the WAF).
 
 ### 2.4 Provider mapping
 
@@ -142,13 +142,13 @@ For Cloudflare ranges, cross-check with the published list:
 curl -s https://www.cloudflare.com/ips-v4 | head -10
 ```
 
-If a denied IP is in a published CDN / partner IP range, the geoblock is the wrong tool â€” switch to an IP allow-list for the partner's range instead of a country-based exception.
+If a denied IP is in a published CDN / partner IP range, the geoblock is the wrong tool — switch to an IP allow-list for the partner's range instead of a country-based exception.
 
 ---
 
 ## 4. The Remediation Matrix
 
-> **Allow-list specific IP ranges, not whole countries.** Cloudflare, Akamai, Fastly, Stripe, Twilio publish authoritative IP-range lists for their infrastructure. Pull those lists into an IP-set allow rule that runs before the geoblock â€” much narrower than "allow CN" or "allow RU".
+> **Allow-list specific IP ranges, not whole countries.** Cloudflare, Akamai, Fastly, Stripe, Twilio publish authoritative IP-range lists for their infrastructure. Pull those lists into an IP-set allow rule that runs before the geoblock — much narrower than "allow CN" or "allow RU".
 >
 > **Scope the geoblock by path, not zone-wide.** Blocking `/admin/*` from country X is a defensible posture. Blocking your entire public marketing site from country X loses real customers and creates Support tickets that the WAF tuning playbook can't solve.
 
@@ -313,7 +313,7 @@ resource "cloudflare_ruleset" "geo_policy" {
 ## 5. Audit Trail
 
 ```
-| 2026-06-17 | app.example.com | gcp-cloud-armor | geo-deny CN/RU/KP/IR on /admin/* | request.path.startsWith('/admin/') | Risk-based scoping: admin endpoints only. Partner IP allow at priority 100 (Cloudflare, Stripe). IP-list refresh schedule: quarterly via vendor API; tracked in JIRA-9202. | <link to log query showing reduced /admin denies>  | preview 2026-06-17 â†’ enforce 2026-06-20 | @secops-lead | 2026-09-15 (quarterly refresh checkpoint) |
+| 2026-06-17 | app.example.com | gcp-cloud-armor | geo-deny CN/RU/KP/IR on /admin/* | request.path.startsWith('/admin/') | Risk-based scoping: admin endpoints only. Partner IP allow at priority 100 (Cloudflare, Stripe). IP-list refresh schedule: quarterly via vendor API; tracked in JIRA-9202. | <link to log query showing reduced /admin denies>  | preview 2026-06-17 → enforce 2026-06-20 | @secops-lead | 2026-09-15 (quarterly refresh checkpoint) |
 ```
 
 For partner-IP allows, the **Review by** is whatever the partner's IP-list-refresh cadence is. Stale partner IP lists = silent partial outages.
@@ -322,21 +322,21 @@ For partner-IP allows, the **Review by** is whatever the partner's IP-list-refre
 
 ## 6. Common pitfalls
 
-- **Allow whole country instead of partner IP range.** "Allow US so Stripe works" allows all 300 million IPs in the US, including potential attackers. Allow the **published Stripe range** instead â€” it's typically a few hundred IPs.
+- **Allow whole country instead of partner IP range.** "Allow US so Stripe works" allows all 300 million IPs in the US, including potential attackers. Allow the **published Stripe range** instead — it's typically a few hundred IPs.
 - **Static partner IP lists go stale.** Stripe, Twilio, GitHub, Cloudflare, etc. publish IP-list APIs. Pull them on a schedule (quarterly minimum) and update the IP set. Track refresh cadence in the audit row.
 - **GeoIP is best-effort.** A blocked IP may be misattributed. Always reproduce with a known-good IP in the target country, and have an explicit appeal path documented for customers who report incorrect blocks.
 - **CDN-to-origin attribution.** If your origin is behind Cloudflare/Akamai, your origin sees the CDN PoP's IP. Country attribution will reflect the PoP location, not the end user. To geoblock the end user accurately, either configure the WAF to read `True-Client-IP` / `X-Forwarded-For` (with `forwarded_ip_config` on AWS WAF) or apply the geoblock at the CDN layer where the original client IP is known.
 - **Sanctions compliance is an application concern, not a WAF concern.** OFAC / EU sanctions list enforcement must happen at the user account / payment / data layer where you can record the decision auditably. The WAF geoblock is a defense-in-depth helper, not a compliance control.
 - **VPN-exit allow rules are sensitive.** Don't allow a VPN-provider IP range globally; it allows all the provider's customers worldwide. Coordinate with your IT / security team for an internal-VPN-only allow scoped to a specific egress IP your VPN concentrator uses.
 - **`ip.geoip.country` vs `cf-ipcountry` header.** Cloudflare exposes both. The rules-language form is authoritative for WAF decisions; the header is what your app sees and may be tampered with by a proxy in between. Don't conflate them.
-- **Subdivision-level rules (US state, etc.).** Cloudflare and Cloud Armor expose subdivision codes. Use sparingly â€” US-state-level geoblock for "California only" is rarely the right tool; per-customer policies almost always are.
+- **Subdivision-level rules (US state, etc.).** Cloudflare and Cloud Armor expose subdivision codes. Use sparingly — US-state-level geoblock for "California only" is rarely the right tool; per-customer policies almost always are.
 
 ---
 
 ## See also
 
-- [docs/concepts/rate-limiting.md](rate-limiting.md) â€” same IP-set + Allow-then-Deny composition pattern.
-- [docs/rules/913100.md](../rules/913100.md), [docs/rules/921110.md](../rules/921110.md) â€” IP-allow disciplines for scanners and partner webhooks.
+- [docs/concepts/rate-limiting.md](rate-limiting.md) — same IP-set + Allow-then-Deny composition pattern.
+- [docs/rules/913100.md](../rules/913100.md), [docs/rules/921110.md](../rules/921110.md) — IP-allow disciplines for scanners and partner webhooks.
 - [docs/provider-guides/gcp-cloud-armor.md](../provider-guides/gcp-cloud-armor.md), [docs/provider-guides/aws-waf.md](../provider-guides/aws-waf.md), [docs/provider-guides/cloudflare-waf.md](../provider-guides/cloudflare-waf.md)
 - [EXCEPTIONS.md](../../EXCEPTIONS.md)
 
@@ -346,29 +346,29 @@ For partner-IP allows, the **Review by** is whatever the partner's IP-list-refre
 
 ### Standards & general
 
-- ISO 3166-1 alpha-2 country codes â€” [https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2).
-- MaxMind GeoLite2 (offline GeoIP DB) â€” [https://dev.maxmind.com/geoip/geolite2-free-geolocation-data](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data).
+- ISO 3166-1 alpha-2 country codes — [https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2).
+- MaxMind GeoLite2 (offline GeoIP DB) — [https://dev.maxmind.com/geoip/geolite2-free-geolocation-data](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data).
 
 ### Partner / CDN IP-list sources
 
-- Cloudflare IP ranges â€” [https://www.cloudflare.com/ips/](https://www.cloudflare.com/ips/).
-- Akamai origin IP ranges â€” [https://techdocs.akamai.com/origin-ip-acl/docs](https://techdocs.akamai.com/origin-ip-acl/docs).
-- Fastly IP ranges â€” [https://api.fastly.com/public-ip-list](https://api.fastly.com/public-ip-list).
-- Stripe webhook IP ranges â€” [https://stripe.com/docs/ips](https://stripe.com/docs/ips).
-- Twilio IP ranges â€” [https://www.twilio.com/docs/sip-trunking/ip-addresses](https://www.twilio.com/docs/sip-trunking/ip-addresses).
-- GitHub Actions runner IP ranges â€” [https://api.github.com/meta](https://api.github.com/meta).
+- Cloudflare IP ranges — [https://www.cloudflare.com/ips/](https://www.cloudflare.com/ips/).
+- Akamai origin IP ranges — [https://techdocs.akamai.com/origin-ip-acl/docs](https://techdocs.akamai.com/origin-ip-acl/docs).
+- Fastly IP ranges — [https://api.fastly.com/public-ip-list](https://api.fastly.com/public-ip-list).
+- Stripe webhook IP ranges — [https://stripe.com/docs/ips](https://stripe.com/docs/ips).
+- Twilio IP ranges — [https://www.twilio.com/docs/sip-trunking/ip-addresses](https://www.twilio.com/docs/sip-trunking/ip-addresses).
+- GitHub Actions runner IP ranges — [https://api.github.com/meta](https://api.github.com/meta).
 
 ### Google Cloud Armor
 
-- Custom rules â€” geo expressions (`origin.region_code`) â€” [https://cloud.google.com/armor/docs/rules-language-reference#attributes](https://cloud.google.com/armor/docs/rules-language-reference#attributes).
-- Cloud Armor request logging â€” [https://cloud.google.com/armor/docs/request-logging](https://cloud.google.com/armor/docs/request-logging).
+- Custom rules — geo expressions (`origin.region_code`) — [https://cloud.google.com/armor/docs/rules-language-reference#attributes](https://cloud.google.com/armor/docs/rules-language-reference#attributes).
+- Cloud Armor request logging — [https://cloud.google.com/armor/docs/request-logging](https://cloud.google.com/armor/docs/request-logging).
 
 ### AWS WAF
 
-- `geo_match_statement` â€” [https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statement-type-geo-match.html](https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statement-type-geo-match.html).
-- `forwarded_ip_config` for X-Forwarded-For-based geo lookup â€” [https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statement-forwarded-ip.html](https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statement-forwarded-ip.html).
+- `geo_match_statement` — [https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statement-type-geo-match.html](https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statement-type-geo-match.html).
+- `forwarded_ip_config` for X-Forwarded-For-based geo lookup — [https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statement-forwarded-ip.html](https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statement-forwarded-ip.html).
 
 ### Cloudflare
 
-- Rules language â€” geographic fields (`ip.geoip.country`, `ip.geoip.subdivision_1_iso_code`) â€” [https://developers.cloudflare.com/ruleset-engine/rules-language/fields/#field-ip-geoip-country](https://developers.cloudflare.com/ruleset-engine/rules-language/fields/#field-ip-geoip-country).
-- IP Access Rules (zone-level allow / challenge / block by country) â€” [https://developers.cloudflare.com/waf/tools/ip-access-rules/](https://developers.cloudflare.com/waf/tools/ip-access-rules/).
+- Rules language — geographic fields (`ip.geoip.country`, `ip.geoip.subdivision_1_iso_code`) — [https://developers.cloudflare.com/ruleset-engine/rules-language/fields/#field-ip-geoip-country](https://developers.cloudflare.com/ruleset-engine/rules-language/fields/#field-ip-geoip-country).
+- IP Access Rules (zone-level allow / challenge / block by country) — [https://developers.cloudflare.com/waf/tools/ip-access-rules/](https://developers.cloudflare.com/waf/tools/ip-access-rules/).

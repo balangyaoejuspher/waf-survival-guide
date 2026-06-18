@@ -1,4 +1,4 @@
-﻿# Contributing to WAF Survival Guide
+# Contributing to WAF Survival Guide
 
 First off, thank you for taking the time to contribute! This project thrives on community-sourced false positives, triage workflows, and infrastructure adjustments. By contributing, you help bridge the gap between Development and Infrastructure teams.
 
@@ -28,7 +28,7 @@ If you want to add a new remediation guide or Infrastructure-as-Code (Terraform/
 
 * **Atomic Changes:** Maintain one distinct feature, fix, or guide per Pull Request.
 * **Documentation Quality:** Avoid dense prose. Prioritize scannability using bullet points, bold markers, and standard code blocks.
-* **Infrastructure-as-Code (IaC) Rules:** Any provided snippets (e.g., HashiCorp Terraform configuration) must be valid syntax and follow security best practicesâ€”specifically minimizing surface area vulnerability (e.g., target exclusions over global rule deactivation).
+* **Infrastructure-as-Code (IaC) Rules:** Any provided snippets (e.g., HashiCorp Terraform configuration) must be valid syntax and follow security best practices—specifically minimizing surface area vulnerability (e.g., target exclusions over global rule deactivation).
 * **Commit Messages:** Use clear, imperative commit summaries (e.g., `feat: add triage runbook for AWS WAF SQLi rule`).
 
 ---
